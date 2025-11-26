@@ -1,0 +1,7 @@
+*.json
+*.spec
+dist
+build
+res
+__pycache__
+back_pyd

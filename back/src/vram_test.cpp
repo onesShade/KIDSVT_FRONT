@@ -1,7 +1,5 @@
 #include "vram_test.hpp"
 
-#include <unistd.h>
-
 VramTest::StepResult VramTest::step() {
     while (true) {
         Word const i = _vmach.i();

@@ -1,10 +1,10 @@
-   0 -1
-    2 loop desc
-        swap
-        0 loop 
-            cur write
-            cur read equal?
-            assert!
-        asc endloop
-    endloop
-    drop drop
+0 -1
+2 loop desc
+    swap
+    0 loop
+        cur write
+        cur read 
+        equal? assert!
+    asc endloop
+endloop
+drop drop

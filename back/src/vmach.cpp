@@ -39,22 +39,22 @@ std::string const Vmach::opcode_cur = "cur", Vmach::opcode_last = "last";
 std::string const Vmach::opcode_equal = "equal?", Vmach::opcode_greater = "greater?",
                   Vmach::opcode_less = "less?";
 std::string const Vmach::opcode_not = "not", Vmach::opcode_xor = "xor", Vmach::opcode_or = "or",
-                  Vmach::opcode_and = "and", Vmach::opcode_lshift = "lshift";
+                  Vmach::opcode_and = "and", Vmach::opcode_lshift = "lsh";
 std::string const Vmach::opcode_add = "add", Vmach::opcode_neg = "neg";
 std::string const Vmach::opcode_push_i = "i", Vmach::opcode_pop_i = "i=";
 
 void Vmach::reset() {
-    i = 0;
-    while (!stack.empty()) stack.pop();
+    _i = 0;
+    while (!_stack.empty()) _stack.pop();
     while (!_hidden_stack.empty()) _hidden_stack.pop();
 
     _state = OK;
-    program->clear(), program->seekg(0, std::ios::beg);
+    _program.clear(), _program.seekg(0, std::ios::beg);
 }
 void Vmach::step() {
     if (_state != OK) return;
     try {
-        auto const op = next_op();
+        auto const op = _last_op = next_op();
         auto const constant = sane_stoull<Word>(op);
 
         if (constant.has_value()) {
@@ -64,22 +64,20 @@ void Vmach::step() {
 
             try {
                 _ops.at(op)();
-            } catch (std::out_of_range const &e) {
-                printf("warn: UNKNOWN OPERATION `%s`\n", op.c_str());
-            }
+            } catch (std::out_of_range const &e) { throw PROGRAM_UNKNOWN_OP; }
         }
     } catch (State const &state_change) { _state = state_change; }
 }
 
 void Vmach::dump_stack() const {
-    std::stack<Word> tmp = stack;
+    std::stack<Word> tmp = _stack;
     std::vector<Word> elems;
     while (!tmp.empty()) {
         elems.push_back(tmp.top());
         tmp.pop();
     }
     std::reverse(elems.begin(), elems.end());
-    std::cout << "[STACK i=" << i << "] ";
+    std::cout << "[STACK i=" << _i << "] ";
     for (auto w : elems) std::cout << std::hex << w << " ";
     std::cout << std::endl;
 }
@@ -97,20 +95,20 @@ std::map<std::string, std::string> const Vmach::_opcode_opposites = {
 
 std::string Vmach::next_op() {
     std::string op;
-    if (!(*program >> op)) throw PROGRAM_ENDED;
+    if (!(_program >> op)) throw PROGRAM_ENDED;
     // makes the machine case-insensitive
     std::transform(op.begin(), op.end(), op.begin(), tolower);
     return op;
 }
 std::string Vmach::prev_op() {
     std::string op;
-    do { program->seekg(-2, std::ios::cur); } while (*program && !isspace(program->get()));
-    do { program->seekg(-2, std::ios::cur); } while (*program && isspace(program->get()));
-    if (!*program) throw PROGRAM_ERROR;
+    do { _program.seekg(-2, std::ios::cur); } while (_program && !isspace(_program.get()));
+    do { _program.seekg(-2, std::ios::cur); } while (_program && isspace(_program.get()));
+    if (!_program) throw PROGRAM_ERROR;
 
-    size_t const pos = program->tellg();
+    size_t const pos = _program.tellg();
     op = next_op();
-    program->seekg(pos);
+    _program.seekg(pos);
 
     return op;
 }
@@ -127,8 +125,6 @@ void Vmach::goto_matching_op(std::string const &target_op, int const dir) {
             nesting_lvl--;
         else if (_opcode_opposites.count(target_op) && op == _opcode_opposites.at(target_op))
             nesting_lvl++;
-
-        printf("next op: '%s'; nesting: %i\n", op.c_str(), nesting_lvl);
     } while (!op.empty() && nesting_lvl > 0);
 
     dir > 0 ? prev_op() : next_op();  // after the backward-searched / at the forward-searched
@@ -136,76 +132,42 @@ void Vmach::goto_matching_op(std::string const &target_op, int const dir) {
 
 Vmach::Word Vmach::stack_pop() {
     try {
-        auto const w = sane_pop(stack);
-        return w;
+        return sane_pop(_stack);
     } catch (std::range_error const &e) { throw STACK_UNDERFLOW; }
 }
-void Vmach::stack_push(Vmach::Word const value) { stack.push(value); }
+void Vmach::stack_push(Vmach::Word const value) { _stack.push(value); }
 
 void Vmach::op_const(Word const value) { stack_push(value); }
-void Vmach::op_loop() {
-    printf("executing loop: ");
-    _hidden_stack.push(i);
-    printf("↑%i; ", i);
-    i = stack_pop();
-    printf("i=%i\n", i);
-}
+void Vmach::op_loop() { _hidden_stack.push(_i), _i = stack_pop(); }
 void Vmach::op_endloop() {
-    printf("reached ENDLOOP; ");
-    if (i == 0) {
+    if (_i == 0) {
         try {
-            i = sane_pop(_hidden_stack);
+            _i = sane_pop(_hidden_stack);
         } catch (std::range_error const &e) { throw PROGRAM_ERROR; }
-        printf("loop ended: i=0; ↓%u\n", i);
     } else {
-        printf("i=%u; next iter\n", i);
         goto_matching_op(opcode_loop, -1);
     }
 }
-void Vmach::op_asc() { i = (i + 1) % _ram.len; }
-void Vmach::op_desc() { i = (i - 1) % _ram.len; }
+void Vmach::op_asc() { _i = (_i + 1) % _ram.len; }
+void Vmach::op_desc() { _i = (_i - 1) % _ram.len; }
 
 void Vmach::op_then() {
-    Word const arg = stack_pop();
-    printf("THEN condition ");
-    if (!arg) {
-        printf("is false; skipping\n");
-        goto_matching_op(opcode_endthen, 1);
-    } else
-        printf("is true; not skipping\n");
+    if (!stack_pop()) goto_matching_op(opcode_endthen, 1);
 }
-void Vmach::op_endthen() { printf("reached ENDTHEN\n"); }
+void Vmach::op_endthen() {}
 
 void Vmach::op_assert() {
-    printf("ASSERTION\n");
-    Word const arg = stack_pop();
-    if (!arg) {
-        printf("\tFAILED!\n");
-        throw HALTED;
-    }
+    if (!stack_pop()) throw ASSERTION_FAILED;
 }
 
-void Vmach::op_read() {
-    Word const val = _ram.read(i);
-    stack_push(val);
-    printf("reading RAM[%u] == %u\n", i, val);
-}
-void Vmach::op_write() {
-    Word const val = stack_pop();
-    _ram.write(i, val);
-    printf("writing RAM[%u] = %u\n", i, val);
-}
+void Vmach::op_read() { stack_push(_ram.read(_i)); }
+void Vmach::op_write() { _ram.write(_i, stack_pop()); }
 
 void Vmach::op_swap() {
     Word const cur = stack_pop(), last = stack_pop();
     stack_push(cur), stack_push(last);
-    printf("SWAPPED: %u <-> %u\n", cur, last);
 }
-void Vmach::op_drop() {
-    stack_pop();
-    printf("DROPPED\n");
-}
-
+void Vmach::op_drop() { stack_pop(); }
 void Vmach::op_last() {
     Word const cur = stack_pop(), last = stack_pop();
     stack_push(last), stack_push(cur), stack_push(last);
@@ -228,5 +190,5 @@ void Vmach::op_lshift() { stack_push(stack_pop() << 1); }
 void Vmach::op_add() { stack_push(stack_pop() + stack_pop()); }
 void Vmach::op_neg() { stack_push(-stack_pop()); }
 
-void Vmach::op_push_i() { stack_push(i); }
-void Vmach::op_pop_i() { i = stack_pop(); }
+void Vmach::op_push_i() { stack_push(_i); }
+void Vmach::op_pop_i() { _i = stack_pop(); }

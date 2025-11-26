@@ -1,0 +1,14 @@
+1
+0 loop
+    cur write
+    lshift
+asc endloop
+drop
+
+1
+0 loop
+    cur read
+    equal? assert!
+    lshift
+asc endloop
+drop

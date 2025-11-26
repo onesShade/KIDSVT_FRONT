@@ -1,109 +1,40 @@
 #include <cstdio>
-#include <fstream>
 
-#include "vmach.hpp"
 #include "vram.hpp"
+#include "vram_test.hpp"
 
-#define PRINT_COLS (4)
+#define PRINT_COLS (8)
 
-static int printword(Vram::Word const word) {
-    return printf(
-        "%c%c%c%c ",
-        (uint8_t)(word >> 24),
-        (uint8_t)(word >> 16),
-        (uint8_t)(word >> 8),
-        (uint8_t)(word >> 0)
-    );
+static void printram(Vram const &ram) {
+    printf("===== RAM dump =====\n");
+    for (unsigned i = 0; i < ram.len / PRINT_COLS; i++) {
+        for (unsigned j = 0; j < PRINT_COLS; j++) printf("%04X ", ram.read(i * PRINT_COLS + j));
+        printf("\n");
+    }
+    printf("===== RAM dump end =====\n\n");
 }
 
-char const *const demoprogram = R"END(
-
-    0 -1
-    2 loop desc
-        swap
-        0 loop 
-            cur write
-            cur read equal?
-            assert!
-        asc endloop
-    endloop
-    drop drop
-
-)END";
-
-/*
- * */
-
 int main() {
-    std::istream *program =
+    Vram vram(32);
+    vram.set_error(3, 4, Vram::DECEPTIVE_READ_0);
+    vram.set_error(1, 4, Vram::TRANSITION_1_TO_0);
 
-        // new std::istringstream(
-        /* R"END(
-
-        1
-        0 loop
-            cur write
-            lshift
-        asc endloop
-        drop
-
-        1
-        0 loop
-            cur read
-            equal? assert!
-            lshift
-        asc endloop
-        drop
-
-        )END", */
-        // R"END(
-
-        //     0DEAD 0BEEF
-
-        //     last @dump drop
-
-        //     cur @dump drop
-
-        //     )END"
-        // );
-        new std::ifstream("./res/test.kids", std::iostream::binary);
-
-    Vram vram(8);
-    Vmach vmach(program, vram);
-    // vram.set_error(3,4,Vram::DECEPTIVE_READ_0);
-    // vram.set_error(3,4,Vram::TRANSITION_1_TO_0);
-    while (vmach.state() == Vmach::OK || vmach.state() == Vmach::HALTED) {
-        while (vmach.state() == Vmach::OK) vmach.step();
-
-        if (vmach.state() == Vmach::HALTED) {
-            printf("\n===== PROGRAM HALTED =====\n");
-
-            char choise;
-            printf("Continue? "), scanf(" %c", &choise);
-            if (choise != 'y') break;
-            vmach.unhalt();
+    VramTest test_manager(vram, "./res/test.kids");
+    while (true) {
+        VramTest::StepResult const r = test_manager.step();
+        switch (r.type) {
+        case VramTest::StepResult::WRITE: printf("wrote into %i\n", r.i); break;
+        case VramTest::StepResult::TEST_SUCCEEDED:
+            printf("assertion succeeded on %i\n", r.i);
+            break;
+        case VramTest::StepResult::TEST_FAILED: printf("assertion failed on %i\n", r.i); break;
+        case VramTest::StepResult::ENDED: goto test_ended;
         }
     }
-    char const *const states[] = {
-        "early",
-        "halted",
-        "successfully",
-        "program error!",
-        "stack underflow!",
-    };
-    printf("\n===== PROGRAM ENDED: %s =====\n\n", states[vmach.state()]);
+test_ended:;
 
-    for (unsigned i = 0; i < vram.len / PRINT_COLS; i++) {
-        for (unsigned j = 0; j < PRINT_COLS; j++) printf("%08X ", vram.read(i * PRINT_COLS + j));
-        printf("| ");
-        for (unsigned j = 0; j < PRINT_COLS; j++) printword(vram.read(i * PRINT_COLS + j));
-        printf("\n");
-    }
-    for (unsigned i = 0; i < vram.len / PRINT_COLS; i++) {
-        for (unsigned j = 0; j < PRINT_COLS; j++) printf("%08X ", vram.read(i * PRINT_COLS + j));
-        printf("| ");
-        for (unsigned j = 0; j < PRINT_COLS; j++) printword(vram.read(i * PRINT_COLS + j));
-        printf("\n");
-    }
+    printram(vram);
+    printram(vram);
+
     return 0;
 }

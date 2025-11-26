@@ -3,7 +3,6 @@
 
 #include <functional>
 #include <map>
-#include <sstream>
 #include <stack>
 #include <string>
 
@@ -14,24 +13,23 @@ class Vmach {
     using Word = Vram::Word;
     enum State {
         OK,
-        HALTED,
+        ASSERTION_FAILED,
         PROGRAM_ENDED,
 
         PROGRAM_ERROR,
+        PROGRAM_UNKNOWN_OP,
         STACK_UNDERFLOW,
     };
 
    public:
-    Vmach(std::istream *const program, Vram &ram) : program(program), _ram(ram) { reset(); }
+    Vmach(std::istream &program, Vram &ram) : _program(program), _ram(ram) { reset(); }
     Vmach(Vmach const &other) = delete;
     Vmach(Vmach const &&other) = delete;
-    ~Vmach() { delete program; }
 
+    inline Word i() { return _i; }
     inline State state() const { return _state; }
-    inline void unhalt() {
-        if (_state == HALTED) _state = OK;
-    }
-    inline void halt() { _state = HALTED; }
+    inline void contin() { _state = OK; }
+    inline std::string const &last_op() { return _last_op; }
 
     void reset();
     void step();
@@ -72,19 +70,21 @@ class Vmach {
     static std::string const opcode_add, opcode_neg;
     static std::string const opcode_push_i, opcode_pop_i;
 
-    std::istream *const program;
-
-    /// This is just a general register of a full size. The only ops that `mod RAM_SIZE`
-    /// are `ASC` and `DESC`. Everything else treats this as a full binary number.
-    Word i = 0;
-    std::stack<Word> stack;
-
    private:
     static std::map<std::string, std::string> const _opcode_opposites;
 
+    std::istream &_program;
+
+    /// This is just a general register of a full size. The only ops that `mod RAM_SIZE`
+    /// are `ASC` and `DESC`. Everything else treats this as a full binary number.
+
     State _state = OK;
+    std::string _last_op;
 
     Vram &_ram;
+
+    Word _i = 0;
+    std::stack<Word> _stack;
     std::stack<Word> _hidden_stack;
 
     std::map<std::string, std::function<void()>> const _ops = {

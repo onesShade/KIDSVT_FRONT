@@ -10,7 +10,7 @@
 
 class Vram {
    public:
-    using Word = uint32_t;
+    using Word = uint16_t;
 
     enum ErrType {
         NO = 0,
@@ -27,19 +27,16 @@ class Vram {
     };
     using WordErrs = std::array<ErrType, sizeof(Word) * 8>;
 
-public:
+   public:
     explicit Vram(size_t const len) : len(len), _data(new Word[len]) {
         for (size_t i = 0; i < len; i++) _data[i] = Word{};
     };
 
-    Vram(const Vram& vram) : len(vram.len), _data(new Word[vram.len]), _errors(vram._errors) {
-        for (size_t i = 0; i < len; i++) _data[i] = vram._data[i]; 
-       
+    Vram(Vram const &vram) : len(vram.len), _data(new Word[vram.len]), _errors(vram._errors) {
+        for (size_t i = 0; i < len; i++) _data[i] = vram._data[i];
     };
 
-    ~Vram() {
-        delete[] _data;
-    }
+    ~Vram() { delete[] _data; }
 
     /// Gets a word at `i`ndex of the ram with set errors applied.
     Word read(size_t const i) const;

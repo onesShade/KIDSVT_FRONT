@@ -63,6 +63,50 @@ class ConfigTab(QWidget):
         mode_layout = QHBoxLayout()
         self.rb_view = QRadioButton("Инфо")
         self.rb_assign = QRadioButton("Назначение")
+        
+        # Если хотите именно цвет тени, используйте ColorRole.Shadow, но обязательно через .color().name()
+        pal = self.palette()
+        dark_color = pal.color(pal.ColorRole.Dark).name() 
+        
+        # 2. Формируем CSS с использованием f-строки
+        rb_style = f"""
+            QRadioButton {{
+                spacing: 8px;
+                font-size: 13px;
+            }}
+            
+            /* -- НЕ ВЫБРАНО -- */
+            QRadioButton::indicator {{
+                width: 18px;
+                height: 18px;
+                border-radius: 11px;
+                border: 2px solid {dark_color};
+                background-color: {dark_color}; /* Полностью закрашен темным */
+            }}
+            
+            /* -- ПРИ НАВЕДЕНИИ -- */
+            QRadioButton::indicator:hover {{
+                /* Можно добавить легкую прозрачность или изменить цвет рамки */
+                border-color: #555; 
+            }}
+            
+            /* -- ВЫБРАНО -- */
+            QRadioButton::indicator:checked {{
+                border: 2px solid {dark_color};
+                /* Градиент: Белый центр -> резкий переход -> Темный край */
+                background-color: qradialgradient(
+                    spread:pad, cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                    stop:0 #ffffff,
+                    stop:0.4 #ffffff,      /* Размер белой точки (0.4 = 40% радиуса) */
+                    stop:0.45 {dark_color}, /* Начало темной границы (сглаживание краев) */
+                    stop:1 {dark_color}    /* Конец темной границы */
+                );
+            }}
+        """
+        self.rb_view.setStyleSheet(rb_style)
+        self.rb_assign.setStyleSheet(rb_style)
+        # -------------------------------
+
         self.rb_view.setChecked(True)
         self.mode_btn_group = QButtonGroup()
         self.mode_btn_group.addButton(self.rb_view)
@@ -79,9 +123,9 @@ class ConfigTab(QWidget):
         self.ram_grid.table.cellClicked.connect(self.on_cell_clicked)
         left_panel.addWidget(self.ram_grid)
 
-        # --- ПРАВАЯ ПАНЕЛЬ ---
+        # --- ПРАВАЯ ПАНЕЛЬ (без изменений) ---
         right_panel = QVBoxLayout()
-
+        # ... (весь код правой панели как был раньше) ...
         grp_config = QGroupBox("Конфигурация (.json)")
         grp_config_layout = QHBoxLayout()
         btn_load = QPushButton("Загрузить")

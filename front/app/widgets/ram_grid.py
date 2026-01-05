@@ -70,9 +70,7 @@ class RamGridWidget(QWidget):
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, col, item)
         
-        # --- ИЗМЕНЕНИЕ: Принудительно ставим черный цвет текста ---
         item.setForeground(QColor(AppConstants.COLOR_TEXT_DEFAULT))
-        # ----------------------------------------------------------
         
         if text is not None:
             item.setText(text)

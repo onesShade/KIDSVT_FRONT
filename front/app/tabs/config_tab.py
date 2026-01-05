@@ -186,10 +186,6 @@ class ConfigTab(QWidget):
         return addr, bit
 
     def update_row_values(self, addr):
-        """
-        Читает слово по адресу из VRAM, разбивает на биты и обновляет 
-        состояние ячеек в строке (текст 0/1 и цвет).
-        """
         try:
             val = self.vram.read(addr)
             for bit_pos in range(16):
@@ -212,7 +208,6 @@ class ConfigTab(QWidget):
             self.update_row_values(i)
 
     def on_recreate_vram(self):
-        """Full backend RAM recreation."""
         word_count = self.spin_words.value()
         
         new_vram = Vram(word_count)

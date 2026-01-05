@@ -50,18 +50,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.report_tab, "Результаты")
 
 if __name__ == "__main__":
-    if os.name == 'nt':
-
-        myappid = 'mycompany.kidsvt.ramsim.1.0' 
-        try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        except ImportError:
-            pass
-
-
     app = QApplication(sys.argv)
-
-
     if os.path.exists(AppConstants.ICON_PATH):
         app_icon = QIcon(AppConstants.ICON_PATH)
         app.setWindowIcon(app_icon)
